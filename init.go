@@ -3,7 +3,7 @@
 * File: init.go
  */
 
-package lib
+package afmm
 
 func init() {
 }
