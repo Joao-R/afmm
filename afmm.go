@@ -1,3 +1,8 @@
+/**
+* Author: João Rafael Diniz Ramos
+* File: afmm.go
+ */
+
 package afmm
 
 import (
@@ -18,7 +23,7 @@ type DataGrid struct {
 
 type pixelHeap struct {
 	data      *DataGrid
-	heapIndex map[int]int
+	heapIndex []int
 	pixelIds  []int
 }
 
@@ -131,7 +136,7 @@ func (state *DataGrid) initFMM(band *pixelHeap) {
 	var idx int
 	/* Boundary detection */
 	band.data = state
-	band.heapIndex = make(map[int]int, (state.rowNum)*(state.colNum)/2) // not used for FMM only, but needed since Pop and Push interact with it
+	band.heapIndex = make([]int, state.rowNum*state.colNum) // not used for FMM only, but needed since Pop and Push interact with it
 	for y := 1; y < state.rowNum-1; y++ {
 		for x := 1; x < state.colNum-1; x++ {
 			idx = y*state.colNum + x
@@ -165,7 +170,7 @@ func (state *DataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 	}
 
 	band.data = state
-	band.heapIndex = make(map[int]int, (state.rowNum)*(state.colNum)/2)
+	band.heapIndex = make([]int, (state.rowNum)*(state.colNum))
 	for y := 1; y < state.rowNum-1; y++ {
 		for x := 1; x < state.colNum-1; x++ {
 			idx = y*state.colNum + x
