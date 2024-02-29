@@ -379,7 +379,7 @@ func FMM(img *image.Image) []float64 {
 	return DT
 }
 
-func AFMM(img *image.Image) []float64 {
+func AFMM(img *image.Image) ([]float64, []float64) {
 	var stateFirst DataGrid
 	stateFirst.ParseImage(img)
 
@@ -414,6 +414,7 @@ func AFMM(img *image.Image) []float64 {
 	wg.Wait()
 
 	gradU := make([]float64, (stateFirst.colNum-2)*(stateFirst.rowNum-2))
+	DT := make([]float64, (stateFirst.colNum-2)*(stateFirst.rowNum-2))
 
 	var newIdx, oldIdx int
 	var deltaUFirst, deltaULast float64
@@ -424,6 +425,7 @@ func AFMM(img *image.Image) []float64 {
 				continue
 			}
 			newIdx = (y-1)*(stateFirst.colNum-2) + (x - 1)
+			DT[newIdx] = stateFirst.T[oldIdx]
 
 			deltaUFirst = 0
 			deltaULast = 0
@@ -456,5 +458,5 @@ func AFMM(img *image.Image) []float64 {
 		}
 	}
 
-	return gradU
+	return gradU, DT
 }
