@@ -471,7 +471,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 }
 
 // Skeletonize takes an image.Image representing a binary mask and a threshold value, t,
-// and returns a .png image of the centerline or skeleton of this mask. Black pixels represent the background,
+// and returns an image.Image of the centerline or skeleton of this mask. Black pixels represent the background,
 // and white pixels represent the object being skeletonized. Boundary defects less than t pixels
 // are ignored. Improve the output by tuning t to the image.
 func Skeletonize(img *image.Image, t float64) image.Image {
