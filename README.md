@@ -22,10 +22,21 @@ Say we have an image in the PNG format which we read into an image.Image variabl
 ```
 
 With example.png being the image
+
 ![example](imgs/example.png)
 
 The result of ```afmm.FMM(img)``` is the distance transform in a contiguous array. After reshaping it into the shape of the image we get
+
 ![distance transform](imgs/dt.png).
+
 The output of ```afmm.AFMM(img)``` on an image is a slice of floats which is higher at the centerlines, also in a contiguous fashion and requires the same reshaping as afmm.FMM. For the above example, we get
+
 ![magnitude of discontinuities in boundary source pixels](imgs/deltaU.png).
-Finally, the output of ```afmm.Skeletonize(img, t)``` is an image.Image where we threshold the above data by t. Different values of t yield different skeletons. For instance, for <em>t</em>=20, 80 and 150: ![t=20](imgs/20.png)![t=80](imgs/80.png)![t=150](imgs/150.png)
+
+Finally, the output of ```afmm.Skeletonize(img, t)``` is an image.Image where we threshold the above data by t. Different values of t yield different skeletons. For instance, for <em>t</em>=20, 80 and 150: 
+
+![t=20](imgs/20.png)
+
+![t=80](imgs/80.png)
+
+![t=150](imgs/150.png)
