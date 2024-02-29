@@ -3,17 +3,19 @@
 * File: afmm.go
  */
 
+// Package afmm contains an implementation of the augmented fast marching method for skeletons and centerlines of binary images
 package afmm
 
 import (
 	"container/heap"
 	"container/list"
 	"image"
+	"image/color"
 	"math"
 	"sync"
 )
 
-type DataGrid struct {
+type dataGrid struct {
 	U      []float64
 	T      []float64
 	f      []uint8
@@ -22,7 +24,7 @@ type DataGrid struct {
 }
 
 type pixelHeap struct {
-	data      *DataGrid
+	data      *dataGrid
 	heapIndex []int
 	pixelIds  []int
 }
@@ -83,7 +85,7 @@ func mooreNeighborhood(idx int, colNum int) [8]int {
 
 // We use this to ensure the initial pixel in boundary
 // detection lies outside the object being skeletonized
-func (d *DataGrid) safeMooreNeighborhood(idx int) [8]int {
+func (d *dataGrid) safeMooreNeighborhood(idx int) [8]int {
 	neighbors := mooreNeighborhood(idx, d.colNum)
 	var offset int
 	for i, neighbor := range neighbors {
@@ -101,7 +103,7 @@ func (d *DataGrid) safeMooreNeighborhood(idx int) [8]int {
 	return neighborsStartingOutside
 }
 
-func (imgData *DataGrid) ParseImage(img *image.Image) {
+func (imgData *dataGrid) ParseImage(img *image.Image) {
 	bounds := (*img).Bounds()
 	imgData.colNum = bounds.Max.X - bounds.Min.X + 2
 	imgData.rowNum = bounds.Max.Y - bounds.Min.Y + 2
@@ -132,7 +134,7 @@ func (imgData *DataGrid) ParseImage(img *image.Image) {
 	}
 }
 
-func (state *DataGrid) initFMM(band *pixelHeap) {
+func (state *dataGrid) initFMM(band *pixelHeap) {
 	var idx int
 	/* Boundary detection */
 	band.data = state
@@ -157,7 +159,7 @@ func (state *DataGrid) initFMM(band *pixelHeap) {
 	heap.Init(band)
 }
 
-func (state *DataGrid) initAFMM(band *pixelHeap, startInFront bool) {
+func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 	var idx int
 	/* Boundary detection */
 
@@ -285,7 +287,7 @@ func propagateU(idx int, U []float64, f []uint8, neighbors [4]int) {
 	}
 }
 
-func (d *DataGrid) stepAFMM(band *pixelHeap) {
+func (d *dataGrid) stepAFMM(band *pixelHeap) {
 	var solution float64
 
 	current := heap.Pop(band).(int)
@@ -316,7 +318,7 @@ func (d *DataGrid) stepAFMM(band *pixelHeap) {
 	}
 }
 
-func (d *DataGrid) stepFMM(band *pixelHeap) {
+func (d *dataGrid) stepFMM(band *pixelHeap) {
 	var solution float64
 
 	current := heap.Pop(band).(int)
@@ -346,7 +348,7 @@ func (d *DataGrid) stepFMM(band *pixelHeap) {
 	}
 }
 
-func (state *DataGrid) afmm(startInFront bool) {
+func (state *dataGrid) afmm(startInFront bool) {
 	var band pixelHeap
 	state.initAFMM(&band, startInFront)
 
@@ -355,8 +357,10 @@ func (state *DataGrid) afmm(startInFront bool) {
 	}
 }
 
+// FMM computes the distance transform of the binary mask provided as argument, i.e.,
+// computes how far a non-background pixel (white) is from a background pixel (black)
 func FMM(img *image.Image) []float64 {
-	var state DataGrid
+	var state dataGrid
 	state.ParseImage(img)
 
 	var band pixelHeap
@@ -379,8 +383,13 @@ func FMM(img *image.Image) []float64 {
 	return DT
 }
 
+// AFMM is a modification of FMM where, alongside distance, we propagate
+// the pixel this distance stems from. By probing discontinuities in this
+// new field, we are able to find the centerline/skeleton. It returns the
+// discontinuity magnitude from which small boundary defects can be thresholded.
+// It also returns the distance transform as FMM
 func AFMM(img *image.Image) ([]float64, []float64) {
-	var stateFirst DataGrid
+	var stateFirst dataGrid
 	stateFirst.ParseImage(img)
 
 	stateFirst.U = make([]float64, stateFirst.colNum*stateFirst.rowNum)
@@ -388,7 +397,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 	mask := make([]uint8, stateFirst.colNum*stateFirst.rowNum)
 	copy(mask, stateFirst.f)
 
-	var stateLast DataGrid
+	var stateLast dataGrid
 	stateLast.colNum, stateLast.rowNum = stateFirst.colNum, stateFirst.rowNum
 	stateLast.f = make([]uint8, stateFirst.colNum*stateFirst.rowNum)
 	stateLast.T = make([]float64, stateFirst.colNum*stateFirst.rowNum)
@@ -413,7 +422,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 
 	wg.Wait()
 
-	gradU := make([]float64, (stateFirst.colNum-2)*(stateFirst.rowNum-2))
+	deltaU := make([]float64, (stateFirst.colNum-2)*(stateFirst.rowNum-2))
 	DT := make([]float64, (stateFirst.colNum-2)*(stateFirst.rowNum-2))
 
 	var newIdx, oldIdx int
@@ -447,16 +456,46 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 				}
 			}
 
-			gradU[newIdx] = deltaUFirst
+			deltaU[newIdx] = deltaUFirst
 			if deltaULast < deltaUFirst {
-				gradU[newIdx] = deltaULast
+				deltaU[newIdx] = deltaULast
 			}
 
-			if gradU[newIdx] <= 3 {
-				gradU[newIdx] = 0
+			if deltaU[newIdx] < 3 {
+				deltaU[newIdx] = 0
 			}
 		}
 	}
 
-	return gradU, DT
+	return deltaU, DT
+}
+
+// Skeletonize takes an image.Image representing a binary mask and a threshold value, t,
+// and returns a .png image of the centerline or skeleton of this mask. Black pixels represent the background,
+// and white pixels represent the object being skeletonized. Boundary defects less than t pixels
+// are ignored. Improve the output by tuning t to the image.
+func Skeletonize(img *image.Image, t float64) image.Image {
+	bounds := (*img).Bounds()
+	colNum := bounds.Max.X - bounds.Min.X
+
+	output := image.NewGray(bounds)
+
+	deltaU, _ := AFMM(img)
+
+	var xIdx, yIdx int
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		yIdx = y - bounds.Min.Y
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			xIdx = x - bounds.Min.X
+
+			if deltaU[xIdx+colNum*yIdx] > t {
+				output.Set(x, y, color.Gray{255})
+			} else {
+				output.Set(x, y, color.Gray{0})
+			}
+		}
+	}
+
+	return output
 }
