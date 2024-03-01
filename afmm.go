@@ -19,8 +19,27 @@ type dataGrid struct {
 	U      []float64
 	T      []float64
 	f      []uint8
+	set    []float64
 	colNum int
 	rowNum int
+}
+
+func getSetID(array []float64, value float64) int {
+	for idx, maxOfInterval := range array {
+		if value <= maxOfInterval {
+			return idx + 1
+		}
+	}
+
+	return 0 // error
+}
+
+func distance(array []float64, biggerValue float64, smallerValue float64) float64 {
+	if getSetID(array, biggerValue) != getSetID(array, smallerValue) {
+		return math.MaxFloat64
+	} else {
+		return biggerValue - smallerValue
+	}
 }
 
 type pixelHeap struct {
@@ -223,6 +242,8 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 				}
 			}
 		}
+
+		state.set = append(state.set, float64(count-1)) // all those below or equal to count belong to same set
 	}
 
 	heap.Init(band)
@@ -261,7 +282,7 @@ func solve(idx1 int, idx2 int, T []float64, f []uint8, solution *float64) {
 	}
 }
 
-func propagateU(idx int, U []float64, f []uint8, neighbors [4]int) {
+func (d *dataGrid) propagateU(idx int, neighbors [8]int) {
 	var a, m, M float64
 	var counter float64
 	a = 0
@@ -269,21 +290,21 @@ func propagateU(idx int, U []float64, f []uint8, neighbors [4]int) {
 	M = -1.0
 	counter = 0.0
 	for _, idx := range neighbors {
-		if f[idx] == 0 {
-			a += U[idx]
-			if U[idx] < m {
-				m = U[idx]
+		if d.f[idx] == 0 {
+			a += d.U[idx]
+			if d.U[idx] < m {
+				m = d.U[idx]
 			}
-			if U[idx] > M {
-				M = U[idx]
+			if d.U[idx] > M {
+				M = d.U[idx]
 			}
 			counter++
 		}
 	}
 	a /= counter
 
-	if (M - m) < 2.0 {
-		U[idx] = a
+	if distance(d.set, M, m) < 2.0 {
+		d.U[idx] = a
 	}
 }
 
@@ -312,7 +333,7 @@ func (d *dataGrid) stepAFMM(band *pixelHeap) {
 			if d.f[neighbor] == 1 {
 				d.f[neighbor] = 2
 				d.U[neighbor] = d.U[current]
-				propagateU(neighbor, d.U, d.f, otherNeighbors) // mooreNeighborhood(neighbor, d.colNum, true))
+				d.propagateU(neighbor, mooreNeighborhood(neighbor, d.colNum))
 			}
 		}
 	}
@@ -445,12 +466,12 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 					continue
 				}
 
-				difference := math.Abs(stateFirst.U[neighbor] - stateFirst.U[oldIdx])
+				difference := math.Abs(distance(stateFirst.set, stateFirst.U[neighbor], stateFirst.U[oldIdx]))
 				if deltaUFirst < difference {
 					deltaUFirst = difference
 				}
 
-				difference = math.Abs(stateLast.U[neighbor] - stateLast.U[oldIdx])
+				difference = math.Abs(distance(stateLast.set, stateLast.U[neighbor], stateLast.U[oldIdx]))
 				if deltaULast < difference {
 					deltaULast = difference
 				}
