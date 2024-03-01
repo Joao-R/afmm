@@ -33,10 +33,10 @@ The output of ```afmm.AFMM(img)``` on an image is a slice of floats which is hig
 
 ![magnitude of discontinuities in boundary source pixels](imgs/deltaU.png).
 
-Finally, the output of ```afmm.Skeletonize(img, t)``` is an image.Image where we threshold the above data by t. Different values of t yield different skeletons. For instance, for <em>t</em>=20, 80 and 150: 
+Finally, the output of ```afmm.Skeletonize(img, t)``` is an image.Image where we threshold the above data by t. Different values of t yield different skeletons. For instance, for <em>t</em>=20, 100 and 250: 
 
 ![t=20](imgs/20.png)
 
-![t=80](imgs/80.png)
+![t=100](imgs/100.png)
 
-![t=150](imgs/150.png)
+![t=250](imgs/250.png)
