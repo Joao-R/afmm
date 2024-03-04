@@ -19,27 +19,9 @@ type dataGrid struct {
 	U      []float64
 	T      []float64
 	f      []uint8
-	set    []float64
+	set    []int
 	colNum int
 	rowNum int
-}
-
-func getSetID(array []float64, value float64) int {
-	for idx, maxOfInterval := range array {
-		if value <= maxOfInterval {
-			return idx + 1
-		}
-	}
-
-	return 0 // error
-}
-
-func distance(array []float64, biggerValue float64, smallerValue float64) float64 {
-	if getSetID(array, biggerValue) != getSetID(array, smallerValue) {
-		return math.MaxFloat64
-	} else {
-		return biggerValue - smallerValue
-	}
 }
 
 type pixelHeap struct {
@@ -214,13 +196,16 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 
 	var found bool
 	var current int
+	var setID int
 	count := 0
+	setID = 0
 
 	for bandList.Len() > 0 {
 
 		current = bandList.Remove(bandList.Front()).(int)
 		state.U[current] = float64(count)
 		state.f[current] = 2
+		state.set[current] = setID
 		count++
 
 		/* propagation */
@@ -233,6 +218,7 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 					current = j
 					state.U[current] = float64(count)
 					state.f[current] = 2
+					state.set[current] = setID
 					count++
 
 					bandList.Remove(idxToList[current])
@@ -243,7 +229,7 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 			}
 		}
 
-		state.set = append(state.set, float64(count-1)) // all those below or equal to count belong to same set
+		setID++
 	}
 
 	heap.Init(band)
@@ -282,29 +268,37 @@ func solve(idx1 int, idx2 int, T []float64, f []uint8, solution *float64) {
 	}
 }
 
-func (d *dataGrid) propagateU(idx int, neighbors [8]int) {
-	var a, m, M float64
+func (d *dataGrid) propagateU(current int, neighbors [8]int) {
+	var a float64
+	var idOfMax, idOfMin int
+	var maxU, minU float64
 	var counter float64
 	a = 0
-	m = math.MaxFloat64
-	M = -1.0
+	minU = math.MaxFloat64
+	maxU = -1.0
 	counter = 0.0
 	for _, idx := range neighbors {
 		if d.f[idx] == 0 {
 			a += d.U[idx]
-			if d.U[idx] < m {
-				m = d.U[idx]
+			if d.U[idx] < minU {
+				minU = d.U[idx]
+				idOfMin = idx
 			}
-			if d.U[idx] > M {
-				M = d.U[idx]
+			if d.U[idx] > maxU {
+				maxU = d.U[idx]
+				idOfMax = idx
 			}
 			counter++
 		}
 	}
-	a /= counter
 
-	if distance(d.set, M, m) < 2.0 {
-		d.U[idx] = a
+	if d.set[idOfMin] != d.set[idOfMax] {
+		return
+	}
+
+	a /= counter
+	if maxU-minU < 2.0 {
+		d.U[current] = a
 	}
 }
 
@@ -333,6 +327,7 @@ func (d *dataGrid) stepAFMM(band *pixelHeap) {
 			if d.f[neighbor] == 1 {
 				d.f[neighbor] = 2
 				d.U[neighbor] = d.U[current]
+				d.set[neighbor] = d.set[current]
 				d.propagateU(neighbor, mooreNeighborhood(neighbor, d.colNum))
 			}
 		}
