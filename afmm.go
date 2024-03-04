@@ -111,6 +111,7 @@ func (imgData *dataGrid) ParseImage(img *image.Image) {
 
 	imgData.f = make([]uint8, imgData.colNum*imgData.rowNum)
 	imgData.T = make([]float64, imgData.colNum*imgData.rowNum)
+	imgData.set = make([]int, imgData.colNum*imgData.rowNum)
 
 	var xx, yy int // relative x and y
 	yy = 1
@@ -124,9 +125,11 @@ func (imgData *dataGrid) ParseImage(img *image.Image) {
 			if lum > 32768 {
 				imgData.f[xx+yy*imgData.colNum] = 1
 				imgData.T[xx+yy*imgData.colNum] = math.MaxFloat64
+				imgData.set[xx+yy*imgData.colNum] = -1
 			} else {
 				imgData.f[xx+yy*imgData.colNum] = 0
 				imgData.T[xx+yy*imgData.colNum] = 0
+				imgData.set[xx+yy*imgData.colNum] = -1
 			}
 
 			xx++
@@ -270,7 +273,7 @@ func solve(idx1 int, idx2 int, T []float64, f []uint8, solution *float64) {
 
 func (d *dataGrid) propagateU(current int, neighbors [8]int) {
 	var a float64
-	var idOfMax, idOfMin int
+	var idxOfMax, idxOfMin int
 	var maxU, minU float64
 	var counter float64
 	a = 0
@@ -282,17 +285,17 @@ func (d *dataGrid) propagateU(current int, neighbors [8]int) {
 			a += d.U[idx]
 			if d.U[idx] < minU {
 				minU = d.U[idx]
-				idOfMin = idx
+				idxOfMin = idx
 			}
 			if d.U[idx] > maxU {
 				maxU = d.U[idx]
-				idOfMax = idx
+				idxOfMax = idx
 			}
 			counter++
 		}
 	}
 
-	if d.set[idOfMin] != d.set[idOfMax] {
+	if d.set[idxOfMin] != d.set[idxOfMax] {
 		return
 	}
 
@@ -418,9 +421,11 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 	stateLast.f = make([]uint8, stateFirst.colNum*stateFirst.rowNum)
 	stateLast.T = make([]float64, stateFirst.colNum*stateFirst.rowNum)
 	stateLast.U = make([]float64, stateFirst.colNum*stateFirst.rowNum)
+	stateLast.set = make([]int, stateFirst.colNum*stateFirst.rowNum)
 	copy(stateLast.f, stateFirst.f)
 	copy(stateLast.T, stateFirst.T)
 	copy(stateLast.U, stateFirst.U)
+	copy(stateLast.set, stateFirst.set)
 
 	var wg sync.WaitGroup
 
