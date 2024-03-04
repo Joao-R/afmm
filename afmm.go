@@ -460,7 +460,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 			deltaUFirst = 0
 			deltaULast = 0
 
-			for _, neighbor := range mooreNeighborhood(oldIdx, stateFirst.colNum) {
+			for _, neighbor := range vonNeumannNeighborhood(oldIdx, stateFirst.colNum) {
 
 				if mask[neighbor] == 0 {
 					continue
