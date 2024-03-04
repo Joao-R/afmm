@@ -10,7 +10,7 @@ Say we have an image in the PNG format which we read into an image.Image variabl
 ```{.go}
   // "os" and "image" imported
 
-  reader, err := os.Open('./example.png')
+  reader, err := os.Open("./example.png")
   if err != nil {
       log.Fatal(err)
   }
