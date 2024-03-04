@@ -471,7 +471,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 					difference = math.MaxFloat64
 				}
 
-				if deltaUFirst > difference {
+				if deltaUFirst < difference {
 					deltaUFirst = difference
 				}
 
@@ -480,7 +480,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 					difference = math.MaxFloat64
 				}
 
-				if deltaULast > difference {
+				if deltaULast < difference {
 					deltaULast = difference
 				}
 			}
