@@ -461,13 +461,21 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 					continue
 				}
 
-				difference := math.Abs(distance(stateFirst.set, stateFirst.U[neighbor], stateFirst.U[oldIdx]))
-				if deltaUFirst < difference {
+				difference := math.Abs(stateFirst.U[neighbor] - stateFirst.U[oldIdx])
+				if stateFirst.set[neighbor] != stateFirst.set[oldIdx] {
+					difference = math.MaxFloat64
+				}
+
+				if deltaUFirst > difference {
 					deltaUFirst = difference
 				}
 
-				difference = math.Abs(distance(stateLast.set, stateLast.U[neighbor], stateLast.U[oldIdx]))
-				if deltaULast < difference {
+				difference = math.Abs(stateLast.U[neighbor] - stateLast.U[oldIdx])
+				if stateLast.set[neighbor] != stateLast.set[oldIdx] {
+					difference = math.MaxFloat64
+				}
+
+				if deltaULast > difference {
 					deltaULast = difference
 				}
 			}
