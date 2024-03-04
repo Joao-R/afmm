@@ -485,13 +485,17 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 				}
 			}
 
+			if deltaUFirst < 3 {
+				deltaUFirst = 0
+			}
+
+			if deltaULast < 3 {
+				deltaULast = 0
+			}
+
 			deltaU[newIdx] = deltaUFirst
 			if deltaULast < deltaUFirst {
 				deltaU[newIdx] = deltaULast
-			}
-
-			if deltaU[newIdx] < 3 {
-				deltaU[newIdx] = 0
 			}
 		}
 	}
