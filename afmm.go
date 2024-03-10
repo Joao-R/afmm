@@ -16,10 +16,14 @@ import (
 )
 
 type dataGrid struct {
-	U      []float64
-	T      []float64
-	f      []uint8
-	set    []int
+	U []int
+	T []float64
+	f []uint8
+
+	set []int
+	x   []float64
+	y   []float64
+
 	colNum int
 	rowNum int
 }
@@ -111,7 +115,6 @@ func (imgData *dataGrid) ParseImage(img *image.Image) {
 
 	imgData.f = make([]uint8, imgData.colNum*imgData.rowNum)
 	imgData.T = make([]float64, imgData.colNum*imgData.rowNum)
-	imgData.set = make([]int, imgData.colNum*imgData.rowNum)
 
 	var xx, yy int // relative x and y
 	yy = 1
@@ -125,11 +128,9 @@ func (imgData *dataGrid) ParseImage(img *image.Image) {
 			if lum > 32768 {
 				imgData.f[xx+yy*imgData.colNum] = 1
 				imgData.T[xx+yy*imgData.colNum] = math.MaxFloat64
-				imgData.set[xx+yy*imgData.colNum] = -1
 			} else {
 				imgData.f[xx+yy*imgData.colNum] = 0
 				imgData.T[xx+yy*imgData.colNum] = 0
-				imgData.set[xx+yy*imgData.colNum] = -1
 			}
 
 			xx++
@@ -197,6 +198,10 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 
 	/* Initialize U */
 
+	state.x = make([]float64, band.Len())
+	state.y = make([]float64, band.Len())
+	state.set = make([]int, band.Len())
+
 	var found bool
 	var current int
 	var setID int
@@ -206,9 +211,11 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 	for bandList.Len() > 0 {
 
 		current = bandList.Remove(bandList.Front()).(int)
-		state.U[current] = float64(count)
+		state.U[current] = count
 		state.f[current] = 2
-		state.set[current] = setID
+		state.set[count] = setID
+		state.x[count] = float64(current % state.colNum)
+		state.y[count] = float64(current / state.colNum)
 		count++
 
 		/* propagation */
@@ -219,9 +226,11 @@ func (state *dataGrid) initAFMM(band *pixelHeap, startInFront bool) {
 			for _, j := range neighbors {
 				if state.f[j] == 3 {
 					current = j
-					state.U[current] = float64(count)
+					state.U[current] = count
 					state.f[current] = 2
-					state.set[current] = setID
+					state.set[count] = setID
+					state.x[count] = float64(current % state.colNum)
+					state.y[count] = float64(current / state.colNum)
 					count++
 
 					bandList.Remove(idxToList[current])
@@ -271,37 +280,23 @@ func solve(idx1 int, idx2 int, T []float64, f []uint8, solution *float64) {
 	}
 }
 
-func (d *dataGrid) propagateU(current int, neighbors [8]int) {
-	var a float64
-	var idxOfMax, idxOfMin int
-	var maxU, minU float64
-	var counter float64
-	a = 0
-	minU = math.MaxFloat64
-	maxU = -1.0
-	counter = 0.0
-	for _, idx := range neighbors {
-		if d.f[idx] == 0 {
-			a += d.U[idx]
-			if d.U[idx] < minU {
-				minU = d.U[idx]
-				idxOfMin = idx
+// This improves AFMM into AFMM* in "Tolerance-Based Feature Transforms" by Reiners D., and Telea A.
+func (d *dataGrid) guessU(idx int, neighbors [8]int) {
+	D := math.MaxFloat64
+	var distance float64
+	var dx, dy float64
+
+	for _, neighbor := range neighbors {
+		if d.f[neighbor] != 1 {
+			dx = float64(idx%d.colNum) - d.x[d.U[neighbor]]
+			dy = float64(idx/d.colNum) - d.y[d.U[neighbor]]
+			distance = math.Sqrt(dx*dx + dy*dy)
+
+			if distance < D {
+				D = distance
+				d.U[idx] = d.U[neighbor]
 			}
-			if d.U[idx] > maxU {
-				maxU = d.U[idx]
-				idxOfMax = idx
-			}
-			counter++
 		}
-	}
-
-	if d.set[idxOfMin] != d.set[idxOfMax] {
-		return
-	}
-
-	a /= counter
-	if maxU-minU < 2.0 {
-		d.U[current] = a
 	}
 }
 
@@ -329,9 +324,8 @@ func (d *dataGrid) stepAFMM(band *pixelHeap) {
 
 			if d.f[neighbor] == 1 {
 				d.f[neighbor] = 2
-				d.U[neighbor] = d.U[current]
-				d.set[neighbor] = d.set[current]
-				d.propagateU(neighbor, mooreNeighborhood(neighbor, d.colNum))
+				neighborhood := mooreNeighborhood(neighbor, d.colNum)
+				d.guessU(neighbor, neighborhood)
 			}
 		}
 	}
@@ -411,7 +405,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 	var stateFirst dataGrid
 	stateFirst.ParseImage(img)
 
-	stateFirst.U = make([]float64, stateFirst.colNum*stateFirst.rowNum)
+	stateFirst.U = make([]int, stateFirst.colNum*stateFirst.rowNum)
 
 	mask := make([]uint8, stateFirst.colNum*stateFirst.rowNum)
 	copy(mask, stateFirst.f)
@@ -420,12 +414,10 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 	stateLast.colNum, stateLast.rowNum = stateFirst.colNum, stateFirst.rowNum
 	stateLast.f = make([]uint8, stateFirst.colNum*stateFirst.rowNum)
 	stateLast.T = make([]float64, stateFirst.colNum*stateFirst.rowNum)
-	stateLast.U = make([]float64, stateFirst.colNum*stateFirst.rowNum)
-	stateLast.set = make([]int, stateFirst.colNum*stateFirst.rowNum)
+	stateLast.U = make([]int, stateFirst.colNum*stateFirst.rowNum)
 	copy(stateLast.f, stateFirst.f)
 	copy(stateLast.T, stateFirst.T)
 	copy(stateLast.U, stateFirst.U)
-	copy(stateLast.set, stateFirst.set)
 
 	var wg sync.WaitGroup
 
@@ -448,6 +440,7 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 
 	var newIdx, oldIdx int
 	var deltaUFirst, deltaULast float64
+	var difference float64
 	for y := 1; y < stateFirst.rowNum-1; y++ {
 		for x := 1; x < stateFirst.colNum-1; x++ {
 			oldIdx = y*stateFirst.colNum + x
@@ -460,24 +453,26 @@ func AFMM(img *image.Image) ([]float64, []float64) {
 			deltaUFirst = 0
 			deltaULast = 0
 
-			for _, neighbor := range vonNeumannNeighborhood(oldIdx, stateFirst.colNum) {
+			for _, neighbor := range mooreNeighborhood(oldIdx, stateFirst.colNum) {
 
 				if mask[neighbor] == 0 {
 					continue
 				}
 
-				difference := math.Abs(stateFirst.U[neighbor] - stateFirst.U[oldIdx])
-				if stateFirst.set[neighbor] != stateFirst.set[oldIdx] {
+				if stateFirst.set[stateFirst.U[neighbor]] != stateFirst.set[stateFirst.U[oldIdx]] {
 					difference = math.MaxFloat64
+				} else {
+					difference = math.Abs(float64(stateFirst.U[neighbor] - stateFirst.U[oldIdx]))
 				}
 
 				if deltaUFirst < difference {
 					deltaUFirst = difference
 				}
 
-				difference = math.Abs(stateLast.U[neighbor] - stateLast.U[oldIdx])
-				if stateLast.set[neighbor] != stateLast.set[oldIdx] {
+				if stateLast.set[stateLast.U[neighbor]] != stateLast.set[stateLast.U[oldIdx]] {
 					difference = math.MaxFloat64
+				} else {
+					difference = math.Abs(float64(stateLast.U[neighbor] - stateLast.U[oldIdx]))
 				}
 
 				if deltaULast < difference {
