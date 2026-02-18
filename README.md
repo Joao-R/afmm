@@ -3,6 +3,8 @@ This package implements an augmented fast marching method algorithm for skeleton
 
 There are three main routines exported by this package, the simplest of which is a distance transform of the binary mask using the fast marching method (FMM). Then we augment this algorithm to take into account the source pixel at the boundary with (AFMM). This function returns the discontinuity magnitude field of these sources, implying a centerline. Finally, we have the all-in-one function Skeletonize which takes in a picture and a threshold <em>t</em>. It performs AFMM and then thresholds the discontinuity field to extract a new grayscale image.Image containing the skeleton and ignoring boundary effects smaller than <em>t</em> pixels.
 
+A working C and Python code based on this implementation is available at https://github.com/preethamam/AFMM-Image-Morphological-Skeletonization as Method 2. It also benchmarks quality and performance between two different methods and between different implementations.
+
 ## Usage
 
 Say we have an image in the PNG format which we read into an image.Image variable as follows
